@@ -27,20 +27,17 @@ WCHAR lpTimestamp_SHA256[2560];
 LPCWSTR ReplaceTimeStamp(LPCWSTR lpOriginalTS) {
     if (!lpOriginalTS)
         return NULL;
-    LPWSTR buf = new WCHAR[2560];
-    memset(buf, 0, sizeof(WCHAR) * 2560);
     if (!_wcsicmp(lpOriginalTS, L"{CustomTimestampMarker-SHA1}")) {
-        wcscat(buf, lpTimestamp_SHA1);
-        return buf;
+        return lpTimestamp_SHA1;
     }
     else if (!_wcsicmp(lpOriginalTS, L"{CustomTimestampMarker-SHA256}")) {
-        wcscat(buf, lpTimestamp_SHA256);
-        return buf;
+        return lpTimestamp_SHA256;
     }
     else {
         return lpOriginalTS;
     }
 }
+
 LONG WINAPI NewCertVerifyTimeValidity(
     LPFILETIME pTimeToVerify,
     PCERT_INFO pCertInfo
@@ -48,115 +45,109 @@ LONG WINAPI NewCertVerifyTimeValidity(
 {
     return 0;
 }
+
 HRESULT WINAPI NewSignerSign(
-    _In_     SIGNER_SUBJECT_INFO* pSubjectInfo,
-    _In_     SIGNER_CERT* pSignerCert,
-    _In_     SIGNER_SIGNATURE_INFO* pSignatureInfo,
-    _In_opt_ SIGNER_PROVIDER_INFO* pProviderInfo,
-    _In_opt_ LPCWSTR               pwszHttpTimeStamp,
-    _In_opt_ PCRYPT_ATTRIBUTES     psRequest,
-    _In_opt_ LPVOID                pSipData
+    SIGNER_SUBJECT_INFO* pSubjectInfo,
+    SIGNER_CERT* pSignerCert,
+    SIGNER_SIGNATURE_INFO* pSignatureInfo,
+    SIGNER_PROVIDER_INFO* pProviderInfo,
+    LPCWSTR pwszHttpTimeStamp,
+    PCRYPT_ATTRIBUTES psRequest,
+    LPVOID pSipData
 )
 {
     return (*pOldSignerSign)(pSubjectInfo, pSignerCert, pSignatureInfo, pProviderInfo, ReplaceTimeStamp(pwszHttpTimeStamp), psRequest, pSipData);
 }
+
 HRESULT WINAPI NewSignerTimeStamp(
-    _In_     SIGNER_SUBJECT_INFO* pSubjectInfo,
-    _In_     LPCWSTR             pwszHttpTimeStamp,
-    _In_opt_ PCRYPT_ATTRIBUTES   psRequest,
-    _In_opt_ LPVOID              pSipData
+    SIGNER_SUBJECT_INFO* pSubjectInfo,
+    LPCWSTR pwszHttpTimeStamp,
+    PCRYPT_ATTRIBUTES psRequest,
+    LPVOID pSipData
 )
 {
     return (*pOldSignerTimeStamp)(pSubjectInfo, ReplaceTimeStamp(pwszHttpTimeStamp), psRequest, pSipData);
 }
+
 HRESULT WINAPI NewSignerTimeStampEx2(
-    _Reserved_ DWORD               dwFlags,
-    _In_       SIGNER_SUBJECT_INFO* pSubjectInfo,
-    _In_       LPCWSTR             pwszHttpTimeStamp,
-    _In_       ALG_ID              dwAlgId,
-    _In_       PCRYPT_ATTRIBUTES   psRequest,
-    _In_       LPVOID              pSipData,
-    _Out_      SIGNER_CONTEXT** ppSignerContext
+    DWORD dwFlags,
+    SIGNER_SUBJECT_INFO* pSubjectInfo,
+    LPCWSTR pwszHttpTimeStamp,
+    ALG_ID dwAlgId,
+    PCRYPT_ATTRIBUTES psRequest,
+    LPVOID pSipData,
+    SIGNER_CONTEXT** ppSignerContext
 )
 {
     return (*pOldSignerTimeStampEx2)(dwFlags, pSubjectInfo, ReplaceTimeStamp(pwszHttpTimeStamp), dwAlgId, psRequest, pSipData, ppSignerContext);
 }
+
 HRESULT WINAPI NewSignerTimeStampEx3(
-    _In_       DWORD                  dwFlags,
-    _In_       DWORD                  dwIndex,
-    _In_       SIGNER_SUBJECT_INFO* pSubjectInfo,
-    _In_       PCWSTR                 pwszHttpTimeStamp,
-    _In_       PCWSTR                 pszAlgorithmOid,
-    _In_opt_   PCRYPT_ATTRIBUTES      psRequest,
-    _In_opt_   PVOID                  pSipData,
-    _Out_      SIGNER_CONTEXT** ppSignerContext,
-    _In_opt_   PCERT_STRONG_SIGN_PARA pCryptoPolicy,
-    _Reserved_ PVOID                  pReserved
+    DWORD dwFlags,
+    DWORD dwIndex,
+    SIGNER_SUBJECT_INFO* pSubjectInfo,
+    PCWSTR pwszHttpTimeStamp,
+    PCWSTR pszAlgorithmOid,
+    PCRYPT_ATTRIBUTES psRequest,
+    PVOID pSipData,
+    SIGNER_CONTEXT** ppSignerContext,
+    PCERT_STRONG_SIGN_PARA pCryptoPolicy,
+    PVOID pReserved
 )
 {
     return (*pOldSignerTimeStampEx3)(dwFlags, dwIndex, pSubjectInfo, ReplaceTimeStamp(pwszHttpTimeStamp), pszAlgorithmOid, psRequest, pSipData, ppSignerContext, pCryptoPolicy, pReserved);
 }
-void WINAPI NewGetLocalTime(
-    LPSYSTEMTIME lpSystemTime
-)
+
+void WINAPI NewGetLocalTime(LPSYSTEMTIME lpSystemTime)
 {
     (*pOldGetLocalTime)(lpSystemTime);
-    if (year >= 0)
-        lpSystemTime->wYear = year;
-    if (month >= 0)
-        lpSystemTime->wMonth = month;
-    if (day >= 0)
-        lpSystemTime->wDay = day;
-    if (hour >= 0)
-        lpSystemTime->wHour = hour;
-    if (minute >= 0)
-        lpSystemTime->wMinute = minute;
-    if (second >= 0)
-        lpSystemTime->wSecond = second;
+    if (year >= 0) lpSystemTime->wYear = year;
+    if (month >= 0) lpSystemTime->wMonth = month;
+    if (day >= 0) lpSystemTime->wDay = day;
+    if (hour >= 0) lpSystemTime->wHour = hour;
+    if (minute >= 0) lpSystemTime->wMinute = minute;
+    if (second >= 0) lpSystemTime->wSecond = second;
 }
 
 bool HookFunctions()
 {
-    if ((hModCrypt32 = LoadLibraryW(L"crypt32.dll")) == NULL
-        || (hModMssign32 = LoadLibraryW(L"mssign32.dll")) == NULL
-        || (hModKernel32 = LoadLibraryW(L"kernel32.dll")) == NULL)
+    hModCrypt32 = LoadLibraryW(L"crypt32.dll");
+    hModMssign32 = LoadLibraryW(L"mssign32.dll");
+    hModKernel32 = LoadLibraryW(L"kernel32.dll");
+    if (!hModCrypt32 || !hModMssign32 || !hModKernel32)
         return false;
 
-    if ((pOldCertVerifyTimeValidity = (fntCertVerifyTimeValidity*)GetProcAddress(hModCrypt32, "CertVerifyTimeValidity")) == NULL
-        || (pOldSignerSign = (fntSignerSign*)GetProcAddress(hModMssign32, "SignerSign")) == NULL
-        || (pOldSignerTimeStamp = (fntSignerTimeStamp*)GetProcAddress(hModMssign32, "SignerTimeStamp")) == NULL
-        || (pOldSignerTimeStampEx2 = (fntSignerTimeStampEx2*)GetProcAddress(hModMssign32, "SignerTimeStampEx2")) == NULL
-        || ((pOldSignerTimeStampEx3 = (fntSignerTimeStampEx3*)GetProcAddress(hModMssign32, "SignerTimeStampEx3")) == NULL && FALSE)
-        /* SignerTimeStampEx3 does not exist in Windows 7 */
-        || (pOldGetLocalTime = (fntGetLocalTime*)GetProcAddress(hModKernel32, "GetLocalTime")) == NULL)
+    pOldCertVerifyTimeValidity = (fntCertVerifyTimeValidity*)GetProcAddress(hModCrypt32, "CertVerifyTimeValidity");
+    pOldSignerSign = (fntSignerSign*)GetProcAddress(hModMssign32, "SignerSign");
+    pOldSignerTimeStamp = (fntSignerTimeStamp*)GetProcAddress(hModMssign32, "SignerTimeStamp");
+    pOldSignerTimeStampEx2 = (fntSignerTimeStampEx2*)GetProcAddress(hModMssign32, "SignerTimeStampEx2");
+    pOldSignerTimeStampEx3 = (fntSignerTimeStampEx3*)GetProcAddress(hModMssign32, "SignerTimeStampEx3");
+    pOldGetLocalTime = (fntGetLocalTime*)GetProcAddress(hModKernel32, "GetLocalTime");
+    if (!pOldCertVerifyTimeValidity || !pOldSignerSign || !pOldSignerTimeStamp || !pOldSignerTimeStampEx2 || !pOldGetLocalTime || (pOldSignerTimeStampEx3 == NULL && GetLastError() != ERROR_PROC_NOT_FOUND))
         return false;
 
-    if (DetourTransactionBegin() != NO_ERROR
-        || DetourAttach(&(PVOID&)pOldCertVerifyTimeValidity, NewCertVerifyTimeValidity) != NO_ERROR
-        || DetourAttach(&(PVOID&)pOldSignerSign, NewSignerSign) != NO_ERROR
-        || DetourAttach(&(PVOID&)pOldSignerTimeStamp, NewSignerTimeStamp) != NO_ERROR
-        || DetourAttach(&(PVOID&)pOldSignerTimeStampEx2, NewSignerTimeStampEx2) != NO_ERROR
-        || (pOldSignerTimeStampEx3 != NULL ? DetourAttach(&(PVOID&)pOldSignerTimeStampEx3, NewSignerTimeStampEx3) != NO_ERROR : FALSE)
-        /* SignerTimeStampEx3 does not exist in Windows 7 */
-        || DetourAttach(&(PVOID&)pOldGetLocalTime, NewGetLocalTime) != NO_ERROR
-        || DetourTransactionCommit() != NO_ERROR)
-        return false;
+    DetourTransactionBegin();
+    DetourAttach(&(PVOID&)pOldCertVerifyTimeValidity, NewCertVerifyTimeValidity);
+    DetourAttach(&(PVOID&)pOldSignerSign, NewSignerSign);
+    DetourAttach(&(PVOID&)pOldSignerTimeStamp, NewSignerTimeStamp);
+    DetourAttach(&(PVOID&)pOldSignerTimeStampEx2, NewSignerTimeStampEx2);
+    if (pOldSignerTimeStampEx3)
+        DetourAttach(&(PVOID&)pOldSignerTimeStampEx3, NewSignerTimeStampEx3);
+    DetourAttach(&(PVOID&)pOldGetLocalTime, NewGetLocalTime);
+    DetourTransactionCommit();
 
     return true;
 }
+
 bool ParseConfig(LPWSTR lpCommandLineConfig, LPWSTR lpCommandLineTimestamp_SHA1, LPWSTR lpCommandLineTimestamp_SHA256)
 {
-    LPWSTR buf = new WCHAR[5120];
-    memset(buf, 0, sizeof(WCHAR) * 5120);
-
-    if (_wgetcwd(buf, 5120) == NULL)
-        return false;
+    WCHAR buf[5120] = { 0 };
+    _wgetcwd(buf, 5120);
     wcscat(buf, L"\\");
 
     if (lpCommandLineConfig) {
         if ((wcschr(lpCommandLineConfig, L':') - lpCommandLineConfig) == 1) {
-            memset(buf, 0, sizeof(WCHAR) * 260);
-            wsprintfW(buf, lpCommandLineConfig);
+            wcscpy(buf, lpCommandLineConfig);
         }
         else {
             wcscat(buf, lpCommandLineConfig);
@@ -174,9 +165,9 @@ bool ParseConfig(LPWSTR lpCommandLineConfig, LPWSTR lpCommandLineTimestamp_SHA1,
     second = GetPrivateProfileIntW(L"Time", L"Second", -1, buf);
 
     if (lpCommandLineTimestamp_SHA1)
-        wsprintfW(lpTimestamp_SHA1, lpCommandLineTimestamp_SHA1);
+        wcscpy(lpTimestamp_SHA1, lpCommandLineTimestamp_SHA1);
     if (lpCommandLineTimestamp_SHA256)
-        wsprintfW(lpTimestamp_SHA256, lpCommandLineTimestamp_SHA256);
+        wcscpy(lpTimestamp_SHA256, lpCommandLineTimestamp_SHA256);
     if (!lpCommandLineTimestamp_SHA1 && !lpCommandLineTimestamp_SHA256) {
         GetPrivateProfileStringW(L"Timestamp", L"Timestamp_SHA1", NULL, lpTimestamp_SHA1, 2560, buf);
         GetPrivateProfileStringW(L"Timestamp", L"Timestamp_SHA256", NULL, lpTimestamp_SHA256, 2560, buf);
@@ -184,11 +175,8 @@ bool ParseConfig(LPWSTR lpCommandLineConfig, LPWSTR lpCommandLineTimestamp_SHA1,
 
     return true;
 }
-BOOL WINAPI DllMain(
-    _In_ HINSTANCE hinstDLL,
-    _In_ DWORD fdwReason,
-    _In_ LPVOID lpvReserved
-)
+
+BOOL WINAPI DllMain(HINSTANCE hinstDLL, DWORD fdwReason, LPVOID lpvReserved)
 {
     if (fdwReason == DLL_PROCESS_ATTACH)
     {
