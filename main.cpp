@@ -21,21 +21,20 @@ fntSignerTimeStampEx3* pOldSignerTimeStampEx3 = NULL;
 fntGetLocalTime* pOldGetLocalTime = NULL;
 
 int year = -1, month = -1, day = -1, hour = -1, minute = -1, second = -1;
-WCHAR lpTimestamp[20];
+WCHAR lpTimestamp_SHA1[2560];
+WCHAR lpTimestamp_SHA256[2560];
 
 LPCWSTR ReplaceTimeStamp(LPCWSTR lpOriginalTS) {
     if (!lpOriginalTS)
         return NULL;
-    LPWSTR buf = new WCHAR[65];
-    memset(buf, 0, sizeof(WCHAR) * 65);
+    LPWSTR buf = new WCHAR[2560];
+    memset(buf, 0, sizeof(WCHAR) * 2560);
     if (!_wcsicmp(lpOriginalTS, L"{CustomTimestampMarker-SHA1}")) {
-        wcscat(buf, L"http://timestamp.pki.jemmylovejenny.tk/SHA1/");
-        wcscat(buf, lpTimestamp);
+        wcscat(buf, lpTimestamp_SHA1);
         return buf;
     }
     else if (!_wcsicmp(lpOriginalTS, L"{CustomTimestampMarker-SHA256}")) {
-        wcscat(buf, L"http://timestamp.pki.jemmylovejenny.tk/SHA256/");
-        wcscat(buf, lpTimestamp);
+        wcscat(buf, lpTimestamp_SHA256);
         return buf;
     }
     else {
@@ -145,12 +144,12 @@ bool HookFunctions()
 
     return true;
 }
-bool ParseConfig(LPWSTR lpCommandLineConfig, LPWSTR lpCommandLineTimestamp)
+bool ParseConfig(LPWSTR lpCommandLineConfig, LPWSTR lpCommandLineTimestamp_SHA1, LPWSTR lpCommandLineTimestamp_SHA256)
 {
-    LPWSTR buf = new WCHAR[260];
-    memset(buf, 0, sizeof(WCHAR) * 260);
+    LPWSTR buf = new WCHAR[5120];
+    memset(buf, 0, sizeof(WCHAR) * 5120);
 
-    if (_wgetcwd(buf, 260) == NULL)
+    if (_wgetcwd(buf, 5120) == NULL)
         return false;
     wcscat(buf, L"\\");
 
@@ -174,11 +173,15 @@ bool ParseConfig(LPWSTR lpCommandLineConfig, LPWSTR lpCommandLineTimestamp)
     minute = GetPrivateProfileIntW(L"Time", L"Minute", -1, buf);
     second = GetPrivateProfileIntW(L"Time", L"Second", -1, buf);
 
-    if (lpCommandLineTimestamp)
-        wsprintfW(lpTimestamp, lpCommandLineTimestamp);
-    else
-        GetPrivateProfileStringW(L"Timestamp", L"Timestamp", NULL, lpTimestamp, 20, buf);
-    
+    if (lpCommandLineTimestamp_SHA1)
+        wsprintfW(lpTimestamp_SHA1, lpCommandLineTimestamp_SHA1);
+    if (lpCommandLineTimestamp_SHA256)
+        wsprintfW(lpTimestamp_SHA256, lpCommandLineTimestamp_SHA256);
+    if (!lpCommandLineTimestamp_SHA1 && !lpCommandLineTimestamp_SHA256) {
+        GetPrivateProfileStringW(L"Timestamp", L"Timestamp_SHA1", NULL, lpTimestamp_SHA1, 2560, buf);
+        GetPrivateProfileStringW(L"Timestamp", L"Timestamp_SHA256", NULL, lpTimestamp_SHA256, 2560, buf);
+    }
+
     return true;
 }
 BOOL WINAPI DllMain(
@@ -193,24 +196,46 @@ BOOL WINAPI DllMain(
         int nArgs = 0;
         szArglist = CommandLineToArgvW(GetCommandLineW(), &nArgs);
 
-        int iconfig = -1, its = -1;
+        int iconfig = -1, isha1 = -1, isha256 = -1;
 
         for (int i = 0; i <= nArgs - 2; i++) {
-            if (!wcscmp(szArglist[i], L"-config"))
+            if (wcscmp(szArglist[i], L"-config") == 0)
                 iconfig = i + 1;
-            if (!wcscmp(szArglist[i], L"-ts"))
-                its = i + 1;
+            if (wcscmp(szArglist[i], L"--timestamp-sha1") == 0)
+                isha1 = i + 1;
+            if (wcscmp(szArglist[i], L"--timestamp-sha256") == 0)
+                isha256 = i + 1;
         }
 
-        if (!ParseConfig(iconfig >= 0 ? szArglist[iconfig] : NULL, its >= 0 ? szArglist[its] : NULL))
+        if (!ParseConfig(iconfig >= 0 ? szArglist[iconfig] : NULL, isha1 >= 0 ? szArglist[isha1] : NULL, isha256 >= 0 ? szArglist[isha256] : NULL))
             MessageBoxW(NULL, L"配置初始化失败，请检查hook.ini和命令行参数！", L"初始化失败", MB_ICONERROR);
-        
+
         LocalFree(szArglist);
 
         if (!HookFunctions())
             MessageBoxW(NULL, L"出现错误，无法Hook指定的函数\r\n请关闭程序重试！", L"Hook失败", MB_ICONERROR);
-        
-        MessageBoxW(NULL, lpTimestamp, L"自定义时间戳为", MB_OK);
+
+        LPWSTR lpTimestamp = new WCHAR[5120];
+        memset(lpTimestamp, 0, sizeof(WCHAR) * 5120);
+        WCHAR SHA256[16];
+        memset(SHA256, 0, sizeof(WCHAR) * 16);
+        if (wcslen(lpTimestamp_SHA1) != 0) {
+            wcscat(lpTimestamp, L"SHA1：");
+            wcscat(lpTimestamp, lpTimestamp_SHA1);
+        }
+        if (wcslen(lpTimestamp_SHA1) != 0 && wcslen(lpTimestamp_SHA256) != 0) {
+            wcscat(SHA256, L"\nSHA256：");
+        }
+        else {
+            wcscat(SHA256, L"SHA256：");
+        }
+        if (wcslen(lpTimestamp_SHA256) != 0) {
+            wcscat(lpTimestamp, SHA256);
+            wcscat(lpTimestamp, lpTimestamp_SHA256);
+        }
+        if (wcslen(lpTimestamp_SHA1) != 0 || wcslen(lpTimestamp_SHA256) != 0) {
+            MessageBoxW(NULL, lpTimestamp, L"自定义时间戳URL为：", MB_OK);
+        }
     }
     return 1;
 }
